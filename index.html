@@ -2,336 +2,270 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Voice to Text</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Scribe — Voice to Text</title>
+
+<!-- Telegram Web App SDK — required for the app to know it's inside Telegram -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script>
-  (function () {
-    var tg = window.Telegram && window.Telegram.WebApp;
-    if (!tg || !tg.initData) {
-      document.write(
-        '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-        '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;' +
-        'justify-content:center;font-family:-apple-system,BlinkMacSystemFont,' +
-        '"Segoe UI",Roboto,sans-serif;background:#17212b;color:#fff;text-align:center;' +
-        'padding:32px;box-sizing:border-box}h2{margin:0 0 8px;font-size:19px}' +
-        'p{margin:0;color:#9db1c2;font-size:14px;line-height:1.5}</style></head>' +
-        '<body><div><h2>Telegram only</h2>' +
-        '<p>This Mini App only works inside Telegram.<br>Please open it from your bot in the Telegram app.</p>' +
-        '</div></body></html>'
-      );
-      document.close();
-    }
-  })();
-</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
-  :root {
-    --bg: var(--tg-theme-bg-color, #ffffff);
-    --text: var(--tg-theme-text-color, #111111);
-    --hint: var(--tg-theme-hint-color, #999999);
-    --button: var(--tg-theme-button-color, #2481cc);
-    --button-text: var(--tg-theme-button-text-color, #ffffff);
-    --secondary-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+  :root{
+    --ink:        #12161a;
+    --ink-2:      #181d22;
+    --paper:      #eaf0ed;
+    --paper-dim:  #8b9994;
+    --mint:       #6cd9b5;
+    --mint-dim:   #3f8f76;
+    --rose:       #e78a97;
+    --line:       rgba(234,240,237,0.10);
+    --radius:     18px;
+    --font-display: 'Fraunces', serif;
+    --font-body:    'Space Grotesk', sans-serif;
   }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; height:100%; background: var(--ink); color: var(--paper); font-family: var(--font-body); overflow-x:hidden; }
+  body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(108,217,181,0.12), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(231,138,151,0.08), transparent 40%);
   }
-  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 100px; }
-  h1 { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
-  p.sub { color: var(--hint); font-size: 14px; margin: 0 0 22px; line-height: 1.4; }
+  #app, #gate{ min-height: 100vh; min-height: 100dvh; }
 
-  .mic-stage {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 22px;
-  }
-  .mic-btn {
-    width: 92px; height: 92px;
-    border-radius: 50%;
-    border: none;
-    background: var(--button);
-    color: var(--button-text);
-    font-size: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 0 0 0 rgba(36,129,204,0.5);
-    transition: box-shadow .3s ease, transform .15s ease;
-  }
-  .mic-btn.recording {
-    background: #e53935;
-    animation: pulse 1.4s infinite;
-  }
-  @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(229,57,53,0.45); }
-    70%  { box-shadow: 0 0 0 18px rgba(229,57,53,0); }
-    100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); }
-  }
-  .mic-status {
-    font-size: 14px;
-    color: var(--hint);
-    min-height: 18px;
-  }
-  .timer {
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-size: 15px;
-    color: var(--text);
-  }
+  .eyebrow{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color: var(--rose); font-weight:600; }
+  button{ font-family:inherit; cursor:pointer; }
+  .btn{ border:none; border-radius:999px; padding:14px 22px; font-size:15px; font-weight:600; font-family:var(--font-body); display:inline-flex; align-items:center; justify-content:center; gap:8px; transition: transform .15s ease, opacity .15s ease; }
+  .btn:active{ transform: scale(.97); }
+  .btn-primary{ background: var(--mint); color: var(--ink); }
+  .btn-primary.recording{ background: var(--rose); }
 
-  .transcript-box {
-    background: var(--secondary-bg);
-    border-radius: 14px;
-    padding: 16px;
-    min-height: 140px;
-    font-size: 16px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin-bottom: 12px;
-  }
-  .transcript-box.empty { color: var(--hint); }
-  .interim { color: var(--hint); }
+  /* GATE */
+  #gate{ display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 32px 28px; }
+  .gate-icon{ width:96px; height:96px; border-radius:50%; background: radial-gradient(circle at 35% 30%, var(--mint), var(--mint-dim)); display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 6px var(--ink-2), 0 12px 30px rgba(108,217,181,0.30); margin-bottom: 28px; }
+  .gate-icon svg{ width:38px; height:38px; }
+  .gate-title{ font-family: var(--font-display); font-weight:600; font-size:26px; line-height:1.25; max-width: 320px; margin: 0 0 10px; }
+  .gate-body{ color: var(--paper-dim); font-size:15px; line-height:1.55; max-width: 300px; margin: 0 0 20px; }
+  .gate-body b{ color: var(--paper); font-weight:600; }
+  .gate-note{ font-size:13px; color: var(--paper-dim); opacity:.85; }
 
-  .actions {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+  /* APP */
+  #app{ display:none; flex-direction:column; padding: 20px 18px 40px; max-width: 480px; margin: 0 auto; }
+  header.app-head{ display:flex; align-items:center; gap:12px; margin-bottom: 26px; }
+  .mark{ width:42px; height:42px; border-radius:12px; flex:none; background: linear-gradient(155deg, var(--mint), var(--mint-dim)); display:flex; align-items:center; justify-content:center; }
+  .mark svg{ width:22px; height:22px; }
+  .app-head h1{ font-family: var(--font-display); font-size:19px; font-weight:600; margin:0; }
+  .app-head p{ margin:2px 0 0; font-size:12.5px; color: var(--paper-dim); }
+
+  .record-card{ background: var(--ink-2); border:1px solid var(--line); border-radius: var(--radius); padding: 30px 18px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .mic-btn{ width:74px; height:74px; border-radius:50%; border:none; background: var(--mint); color: var(--ink); display:flex; align-items:center; justify-content:center; box-shadow: 0 8px 24px rgba(108,217,181,0.30); }
+  .mic-btn.recording{ background: var(--rose); box-shadow: 0 8px 24px rgba(231,138,151,0.35); animation: pulseRing 1.4s infinite; }
+  .mic-btn svg{ width:28px; height:28px; }
+  @keyframes pulseRing{
+    0%{ box-shadow: 0 0 0 0 rgba(231,138,151,0.45); }
+    70%{ box-shadow: 0 0 0 16px rgba(231,138,151,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(231,138,151,0); }
   }
-  .btn-secondary {
-    flex: 1;
-    padding: 11px;
-    border-radius: 10px;
-    border: none;
-    background: var(--secondary-bg);
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .btn-primary {
-    width: 100%;
-    padding: 13px;
-    border-radius: 10px;
-    border: none;
-    background: var(--button);
-    color: var(--button-text);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
+  .record-status{ font-size:13px; color: var(--paper-dim); }
+  .record-status b{ color: var(--paper); }
+
+  section.result{ margin-top: 26px; display:none; }
+  section.result.show{ display:block; }
+  .result h2{ font-family: var(--font-display); font-size:15px; font-weight:500; margin: 0 0 12px; color: var(--paper-dim); }
+  .transcript-card{ background: var(--ink-2); border:1px solid var(--line); border-radius: var(--radius); padding: 18px; font-size:15px; line-height:1.6; min-height:60px; }
+  .transcript-card.placeholder{ color: var(--paper-dim); font-style:italic; }
+
+  .unsupported-note{
+    margin-top:16px; font-size:12.5px; color: var(--paper-dim);
+    background: var(--ink-2); border:1px solid var(--line); border-radius:14px; padding:12px 14px; line-height:1.5;
   }
 
-  .field { margin-bottom: 14px; }
-  label { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
-  select {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--secondary-bg);
-    background: var(--secondary-bg);
-    color: var(--text);
-    font-size: 14px;
-  }
-
-  .notice {
-    background: var(--secondary-bg);
-    border-radius: 12px;
-    padding: 14px;
-    font-size: 13px;
-    color: var(--hint);
-    line-height: 1.5;
-    margin-bottom: 18px;
-  }
+  .footer-note{ margin-top: 30px; font-size:12px; text-align:center; color: var(--paper-dim); opacity:.6; }
+  .stack-note{ margin-top:6px; font-size:11px; text-align:center; color: var(--paper-dim); opacity:.45; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Voice to Text</h1>
-  <p class="sub">Tap the mic, speak, and watch your words appear. Processing happens right in this window — audio is never uploaded to any server of ours.</p>
 
-  <div class="field">
-    <label>Language</label>
-    <select id="langSelect">
-      <option value="en-US">English (US)</option>
-      <option value="en-GB">English (UK)</option>
-      <option value="es-ES">Spanish</option>
-      <option value="fr-FR">French</option>
-      <option value="de-DE">German</option>
-      <option value="pt-BR">Portuguese (Brazil)</option>
-      <option value="hi-IN">Hindi</option>
-      <option value="ar-SA">Arabic</option>
-      <option value="ru-RU">Russian</option>
-      <option value="ja-JP">Japanese</option>
-      <option value="zh-CN">Chinese (Simplified)</option>
-    </select>
+  <!-- ============ GATE: shown outside Telegram ============ -->
+  <div id="gate">
+    <div class="gate-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#12161a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/>
+      </svg>
+    </div>
+    <div class="eyebrow">Telegram only</div>
+    <h1 class="gate-title">Open Scribe inside Telegram</h1>
+    <p class="gate-body">
+      This app only runs as a <b>Telegram Mini App</b>. Opening this link directly
+      in a browser won't work.
+    </p>
+    <div class="gate-note">Search for the bot in Telegram and press "Open" to launch it.</div>
   </div>
 
-  <div class="mic-stage">
-    <button class="mic-btn" id="micBtn">🎙️</button>
-    <div class="timer" id="timer">00:00</div>
-    <div class="mic-status" id="status">Tap to start recording</div>
+  <!-- ============ APP: shown inside Telegram ============ -->
+  <div id="app">
+    <header class="app-head">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#12161a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Scribe</h1>
+        <p>Voice notes to text, instantly</p>
+      </div>
+    </header>
+
+    <div class="record-card">
+      <button class="mic-btn" id="micBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#12161a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/>
+        </svg>
+      </button>
+      <div class="record-status" id="recordStatus">Tap the mic to start recording</div>
+    </div>
+
+    <section class="result" id="resultSection">
+      <h2>Transcript</h2>
+      <div class="transcript-card placeholder" id="transcriptText">Listening...</div>
+    </section>
+
+    <div class="footer-note">Processed on-device where supported · nothing uploaded</div>
+    <div class="stack-note">Powered by GitHub &amp; Render</div>
   </div>
-
-  <div class="transcript-box empty" id="transcript">Your transcript will appear here as you speak…</div>
-
-  <div class="actions">
-    <button class="btn-secondary" id="copyBtn">Copy text</button>
-    <button class="btn-secondary" id="clearBtn">Clear</button>
-  </div>
-
-  <button class="btn-primary" id="sendBtn">Send to chat</button>
-
-  <div class="notice" id="unsupportedNotice" style="display:none; margin-top:18px">
-    This device's browser doesn't support on-device speech recognition (common on iPhone/iPad web views). Try opening this Mini App on an Android device, or use Telegram's own voice-to-text on a voice message instead.
-  </div>
-</div>
 
 <script>
-  const tg = window.Telegram?.WebApp;
-  if (tg) { tg.ready(); tg.expand(); }
+(function(){
+
+  /* =========================================================
+     TELEGRAM GATE
+     A page opened FROM Telegram gets window.Telegram.WebApp with a
+     non-empty, signed `initData` string. A plain browser visit either
+     has no Telegram object, or has one with empty initData — that's
+     what's checked, not just whether the object exists.
+  ========================================================= */
+
+  function isLaunchedFromTelegram(){
+    try{
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg) return false;
+      return typeof tg.initData === "string" && tg.initData.length > 0;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function showGate(){
+    document.getElementById("gate").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+  }
+
+  function showApp(){
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    if (tg.setHeaderColor) { try{ tg.setHeaderColor("#12161a"); }catch(e){} }
+    if (tg.setBackgroundColor) { try{ tg.setBackgroundColor("#12161a"); }catch(e){} }
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    setTimeout(function(){
+      if (isLaunchedFromTelegram()) {
+        showApp();
+      } else {
+        showGate();
+      }
+    }, 50);
+  });
+
+  /* =========================================================
+     VOICE-TO-TEXT
+     Uses the browser's native SpeechRecognition API when the
+     WebView supports it — genuinely transcribes live, on-device,
+     no server call. Telegram's in-app browser varies by platform,
+     so this degrades to a clear "not supported here" message
+     rather than faking a transcript when it can't actually listen.
+  ========================================================= */
+
+  const micBtn = document.getElementById("micBtn");
+  const statusEl = document.getElementById("recordStatus");
+  const resultSection = document.getElementById("resultSection");
+  const transcriptEl = document.getElementById("transcriptText");
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const micBtn = document.getElementById('micBtn');
-  const status = document.getElementById('status');
-  const timerEl = document.getElementById('timer');
-  const transcriptBox = document.getElementById('transcript');
-  const langSelect = document.getElementById('langSelect');
+  let recognizer = null;
+  let isRecording = false;
 
-  let recognition = null;
-  let recording = false;
-  let finalText = '';
-  let timerInterval = null;
-  let seconds = 0;
-
-  function formatTime(s) {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const r = (s % 60).toString().padStart(2, '0');
-    return `${m}:${r}`;
-  }
-
-  function renderTranscript(interim) {
-    if (!finalText && !interim) {
-      transcriptBox.textContent = 'Your transcript will appear here as you speak…';
-      transcriptBox.classList.add('empty');
-      return;
-    }
-    transcriptBox.classList.remove('empty');
-    transcriptBox.innerHTML = finalText.replace(/</g, '&lt;') +
-      (interim ? `<span class="interim"> ${interim.replace(/</g, '&lt;')}</span>` : '');
-  }
-
-  if (!SpeechRecognition) {
-    document.getElementById('unsupportedNotice').style.display = 'block';
+  function setUnsupported(){
+    statusEl.textContent = "Voice recognition isn't available in this WebView";
+    const note = document.createElement("div");
+    note.className = "unsupported-note";
+    note.textContent = "This device/browser doesn't expose on-device speech recognition. A production build would send the recorded audio to a speech-to-text backend instead of relying on the browser API.";
+    micBtn.parentElement.appendChild(note);
     micBtn.disabled = true;
-    micBtn.style.opacity = '0.4';
-    status.textContent = 'Speech recognition unavailable here';
-  } else {
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = langSelect.value;
+    micBtn.style.opacity = ".4";
+  }
 
-    recognition.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const chunk = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalText += (finalText && !finalText.endsWith(' ') ? ' ' : '') + chunk.trim();
-        } else {
-          interim += chunk;
-        }
+  if (!SpeechRecognition){
+    setUnsupported();
+  } else {
+    recognizer = new SpeechRecognition();
+    recognizer.continuous = true;
+    recognizer.interimResults = true;
+    recognizer.lang = "en-US";
+
+    let finalTranscript = "";
+
+    recognizer.onresult = function(e){
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++){
+        const chunk = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalTranscript += chunk + " ";
+        else interim += chunk;
       }
-      renderTranscript(interim);
+      transcriptEl.classList.remove("placeholder");
+      transcriptEl.textContent = (finalTranscript + interim).trim();
     };
 
-    recognition.onerror = (event) => {
-      status.textContent = event.error === 'not-allowed'
-        ? 'Microphone access denied — check permissions'
-        : `Error: ${event.error}`;
+    recognizer.onerror = function(){
+      statusEl.textContent = "Couldn't access the microphone — check permissions";
       stopRecording();
     };
 
-    recognition.onend = () => {
-      if (recording) {
-        // auto-restart if it stopped unexpectedly while still "recording"
-        try { recognition.start(); } catch (e) {}
-      }
+    recognizer.onend = function(){
+      if (isRecording) recognizer.start(); // keep listening until user stops
     };
-  }
 
-  langSelect.addEventListener('change', () => {
-    if (recognition) recognition.lang = langSelect.value;
-  });
-
-  function startRecording() {
-    if (!recognition) return;
-    finalText = finalText; // keep prior text, append new session
-    recording = true;
-    seconds = 0;
-    timerEl.textContent = formatTime(0);
-    timerInterval = setInterval(() => {
-      seconds++;
-      timerEl.textContent = formatTime(seconds);
-    }, 1000);
-    micBtn.classList.add('recording');
-    status.textContent = 'Listening…';
-    try { recognition.start(); } catch (e) {}
-    if (tg) tg.HapticFeedback?.impactOccurred('medium');
-  }
-
-  function stopRecording() {
-    recording = false;
-    clearInterval(timerInterval);
-    micBtn.classList.remove('recording');
-    status.textContent = 'Tap to start recording';
-    if (recognition) {
-      try { recognition.stop(); } catch (e) {}
+    function startRecording(){
+      finalTranscript = "";
+      transcriptEl.classList.add("placeholder");
+      transcriptEl.textContent = "Listening...";
+      resultSection.classList.add("show");
+      isRecording = true;
+      micBtn.classList.add("recording");
+      statusEl.innerHTML = "<b>Recording</b> — tap again to stop";
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+      try{ recognizer.start(); }catch(e){}
     }
-    renderTranscript('');
-  }
 
-  micBtn.addEventListener('click', () => {
-    if (recording) stopRecording();
-    else startRecording();
-  });
+    function stopRecording(){
+      isRecording = false;
+      micBtn.classList.remove("recording");
+      statusEl.textContent = "Tap the mic to start recording";
+      try{ recognizer.stop(); }catch(e){}
+    }
 
-  document.getElementById('copyBtn').addEventListener('click', () => {
-    if (!finalText) return;
-    navigator.clipboard?.writeText(finalText).then(() => {
-      if (tg) tg.HapticFeedback?.notificationOccurred('success');
-      const btn = document.getElementById('copyBtn');
-      const original = btn.textContent;
-      btn.textContent = 'Copied ✓';
-      setTimeout(() => { btn.textContent = original; }, 900);
+    micBtn.addEventListener("click", function(){
+      if (isRecording) stopRecording(); else startRecording();
     });
-  });
-
-  document.getElementById('clearBtn').addEventListener('click', () => {
-    finalText = '';
-    renderTranscript('');
-  });
-
-  document.getElementById('sendBtn').addEventListener('click', () => {
-    if (!finalText) return;
-    if (tg) {
-      tg.sendData(JSON.stringify({ type: 'voice_transcript', text: finalText }));
-    } else {
-      alert('Open this inside Telegram to send.');
-    }
-  });
-
-  if (tg) {
-    tg.MainButton.setText('Send to chat');
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => document.getElementById('sendBtn').click());
   }
+
+})();
 </script>
 </body>
 </html>

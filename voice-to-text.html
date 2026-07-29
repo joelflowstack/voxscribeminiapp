@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Voice to Text</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  (function () {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.initData) {
+      document.write(
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+        '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;' +
+        'justify-content:center;font-family:-apple-system,BlinkMacSystemFont,' +
+        '"Segoe UI",Roboto,sans-serif;background:#17212b;color:#fff;text-align:center;' +
+        'padding:32px;box-sizing:border-box}h2{margin:0 0 8px;font-size:19px}' +
+        'p{margin:0;color:#9db1c2;font-size:14px;line-height:1.5}</style></head>' +
+        '<body><div><h2>Telegram only</h2>' +
+        '<p>This Mini App only works inside Telegram.<br>Please open it from your bot in the Telegram app.</p>' +
+        '</div></body></html>'
+      );
+      document.close();
+    }
+  })();
+</script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #111111);
+    --hint: var(--tg-theme-hint-color, #999999);
+    --button: var(--tg-theme-button-color, #2481cc);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 100px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
+  p.sub { color: var(--hint); font-size: 14px; margin: 0 0 22px; line-height: 1.4; }
+
+  .mic-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .mic-btn {
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    border: none;
+    background: var(--button);
+    color: var(--button-text);
+    font-size: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(36,129,204,0.5);
+    transition: box-shadow .3s ease, transform .15s ease;
+  }
+  .mic-btn.recording {
+    background: #e53935;
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(229,57,53,0.45); }
+    70%  { box-shadow: 0 0 0 18px rgba(229,57,53,0); }
+    100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); }
+  }
+  .mic-status {
+    font-size: 14px;
+    color: var(--hint);
+    min-height: 18px;
+  }
+  .timer {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .transcript-box {
+    background: var(--secondary-bg);
+    border-radius: 14px;
+    padding: 16px;
+    min-height: 140px;
+    font-size: 16px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 12px;
+  }
+  .transcript-box.empty { color: var(--hint); }
+  .interim { color: var(--hint); }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .btn-secondary {
+    flex: 1;
+    padding: 11px;
+    border-radius: 10px;
+    border: none;
+    background: var(--secondary-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    background: var(--button);
+    color: var(--button-text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
+  select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--secondary-bg);
+    background: var(--secondary-bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .notice {
+    background: var(--secondary-bg);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    color: var(--hint);
+    line-height: 1.5;
+    margin-bottom: 18px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Voice to Text</h1>
+  <p class="sub">Tap the mic, speak, and watch your words appear. Processing happens right in this window — audio is never uploaded to any server of ours.</p>
+
+  <div class="field">
+    <label>Language</label>
+    <select id="langSelect">
+      <option value="en-US">English (US)</option>
+      <option value="en-GB">English (UK)</option>
+      <option value="es-ES">Spanish</option>
+      <option value="fr-FR">French</option>
+      <option value="de-DE">German</option>
+      <option value="pt-BR">Portuguese (Brazil)</option>
+      <option value="hi-IN">Hindi</option>
+      <option value="ar-SA">Arabic</option>
+      <option value="ru-RU">Russian</option>
+      <option value="ja-JP">Japanese</option>
+      <option value="zh-CN">Chinese (Simplified)</option>
+    </select>
+  </div>
+
+  <div class="mic-stage">
+    <button class="mic-btn" id="micBtn">🎙️</button>
+    <div class="timer" id="timer">00:00</div>
+    <div class="mic-status" id="status">Tap to start recording</div>
+  </div>
+
+  <div class="transcript-box empty" id="transcript">Your transcript will appear here as you speak…</div>
+
+  <div class="actions">
+    <button class="btn-secondary" id="copyBtn">Copy text</button>
+    <button class="btn-secondary" id="clearBtn">Clear</button>
+  </div>
+
+  <button class="btn-primary" id="sendBtn">Send to chat</button>
+
+  <div class="notice" id="unsupportedNotice" style="display:none; margin-top:18px">
+    This device's browser doesn't support on-device speech recognition (common on iPhone/iPad web views). Try opening this Mini App on an Android device, or use Telegram's own voice-to-text on a voice message instead.
+  </div>
+</div>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = document.getElementById('micBtn');
+  const status = document.getElementById('status');
+  const timerEl = document.getElementById('timer');
+  const transcriptBox = document.getElementById('transcript');
+  const langSelect = document.getElementById('langSelect');
+
+  let recognition = null;
+  let recording = false;
+  let finalText = '';
+  let timerInterval = null;
+  let seconds = 0;
+
+  function formatTime(s) {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const r = (s % 60).toString().padStart(2, '0');
+    return `${m}:${r}`;
+  }
+
+  function renderTranscript(interim) {
+    if (!finalText && !interim) {
+      transcriptBox.textContent = 'Your transcript will appear here as you speak…';
+      transcriptBox.classList.add('empty');
+      return;
+    }
+    transcriptBox.classList.remove('empty');
+    transcriptBox.innerHTML = finalText.replace(/</g, '&lt;') +
+      (interim ? `<span class="interim"> ${interim.replace(/</g, '&lt;')}</span>` : '');
+  }
+
+  if (!SpeechRecognition) {
+    document.getElementById('unsupportedNotice').style.display = 'block';
+    micBtn.disabled = true;
+    micBtn.style.opacity = '0.4';
+    status.textContent = 'Speech recognition unavailable here';
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = langSelect.value;
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const chunk = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += (finalText && !finalText.endsWith(' ') ? ' ' : '') + chunk.trim();
+        } else {
+          interim += chunk;
+        }
+      }
+      renderTranscript(interim);
+    };
+
+    recognition.onerror = (event) => {
+      status.textContent = event.error === 'not-allowed'
+        ? 'Microphone access denied — check permissions'
+        : `Error: ${event.error}`;
+      stopRecording();
+    };
+
+    recognition.onend = () => {
+      if (recording) {
+        // auto-restart if it stopped unexpectedly while still "recording"
+        try { recognition.start(); } catch (e) {}
+      }
+    };
+  }
+
+  langSelect.addEventListener('change', () => {
+    if (recognition) recognition.lang = langSelect.value;
+  });
+
+  function startRecording() {
+    if (!recognition) return;
+    finalText = finalText; // keep prior text, append new session
+    recording = true;
+    seconds = 0;
+    timerEl.textContent = formatTime(0);
+    timerInterval = setInterval(() => {
+      seconds++;
+      timerEl.textContent = formatTime(seconds);
+    }, 1000);
+    micBtn.classList.add('recording');
+    status.textContent = 'Listening…';
+    try { recognition.start(); } catch (e) {}
+    if (tg) tg.HapticFeedback?.impactOccurred('medium');
+  }
+
+  function stopRecording() {
+    recording = false;
+    clearInterval(timerInterval);
+    micBtn.classList.remove('recording');
+    status.textContent = 'Tap to start recording';
+    if (recognition) {
+      try { recognition.stop(); } catch (e) {}
+    }
+    renderTranscript('');
+  }
+
+  micBtn.addEventListener('click', () => {
+    if (recording) stopRecording();
+    else startRecording();
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    if (!finalText) return;
+    navigator.clipboard?.writeText(finalText).then(() => {
+      if (tg) tg.HapticFeedback?.notificationOccurred('success');
+      const btn = document.getElementById('copyBtn');
+      const original = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.textContent = original; }, 900);
+    });
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    finalText = '';
+    renderTranscript('');
+  });
+
+  document.getElementById('sendBtn').addEventListener('click', () => {
+    if (!finalText) return;
+    if (tg) {
+      tg.sendData(JSON.stringify({ type: 'voice_transcript', text: finalText }));
+    } else {
+      alert('Open this inside Telegram to send.');
+    }
+  });
+
+  if (tg) {
+    tg.MainButton.setText('Send to chat');
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => document.getElementById('sendBtn').click());
+  }
+</script>
+</body>
+</html>
